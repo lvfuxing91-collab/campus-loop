@@ -1,0 +1,60 @@
+@startuml 时序图-登录
+skinparam shadowing false
+title 登录时序图
+
+actor 用户
+participant "LoginFrame" as UI
+participant "AuthServiceImpl" as Auth
+participant "UserRepositoryImpl" as Repo
+participant "PasswordUtil" as Pwd
+participant "OperationLogRepositoryImpl" as Log
+database "SQLite\ncampus.db" as DB
+
+用户 -> UI : 输入用户名、密码\n点击"登录"
+activate UI
+UI -> UI : 校验非空
+alt 输入为空
+    UI --> 用户 : 提示"请输入用户名和密码"
+end
+
+UI -> Auth : login(username, rawPassword)
+activate Auth
+Auth -> Repo : findByUsername(username)
+activate Repo
+Repo -> DB : SELECT * FROM users WHERE username = ?
+DB --> Repo : 结果行 / 空
+Repo --> Auth : Optional<User>
+deactivate Repo
+
+alt 用户不存在
+    Auth --> UI : throw AuthenticationException("用户名或密码错误")
+else 账号已停用
+    Auth -> Auth : user.isEnabled() == false
+    Auth --> UI : throw AuthenticationException("账号已被停用，请联系管理员")
+else 密码错误
+    Auth -> Pwd : verify(rawPassword, salt, hash)
+    Pwd --> Auth : false
+    Auth --> UI : throw AuthenticationException("用户名或密码错误")
+else 认证通过
+    Auth -> Log : insert(OperationLog(LOGIN))
+    Log -> DB : INSERT INTO operation_logs
+    Auth --> UI : User
+end
+deactivate Auth
+
+alt 认证成功
+    UI -> UI : context.setCurrentUser(user)
+    UI -> UI : 打开 MainFrame
+    UI --> 用户 : 显示主界面
+else 认证失败
+    UI --> 用户 : JOptionPane 显示中文提示
+end
+deactivate UI
+
+note right of Auth
+  失败提示统一为"用户名或密码错误"，
+  不区分用户不存在与密码错误，
+  避免用户名枚举
+end note
+
+@enduml

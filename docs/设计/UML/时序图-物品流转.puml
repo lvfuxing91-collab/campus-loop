@@ -1,0 +1,87 @@
+@startuml 时序图-物品流转
+skinparam shadowing false
+title 物品发布与流转时序图
+
+actor 发布者 as Seller
+actor 浏览者 as Buyer
+participant "PublishItemDialog" as Dlg
+participant "ItemServiceImpl" as ItemSvc
+participant "ItemRepositoryImpl" as ItemRepo
+participant "FavoriteRepositoryImpl" as FavRepo
+participant "DealServiceImpl" as DealSvc
+participant "DealRepositoryImpl" as DealRepo
+database "SQLite\ncampus.db" as DB
+
+== 发布（迭代 1 已实现） ==
+Seller -> Dlg : 填写名称/分类/交易方式/成色/价格
+activate Dlg
+Dlg -> Dlg : 表单校验（必填、价格为非负数字）
+Dlg -> ItemSvc : publish(ownerId, draft)
+activate ItemSvc
+ItemSvc -> ItemSvc : Validators 校验标题、描述、价格
+alt 校验失败
+    ItemSvc --> Dlg : throw ValidationException
+    Dlg --> Seller : 提示具体原因
+else 校验通过
+    ItemSvc -> ItemRepo : insert(item)
+    activate ItemRepo
+    ItemRepo -> DB : INSERT INTO items(...)
+    DB --> ItemRepo : 新主键
+    ItemRepo --> ItemSvc : id
+    deactivate ItemRepo
+    ItemSvc --> Dlg : id
+    Dlg --> Seller : 提示"发布成功"，刷新检索页
+end
+deactivate ItemSvc
+deactivate Dlg
+
+== 检索与收藏（迭代 1 已实现） ==
+Buyer -> ItemSvc : search(ItemQuery(keyword, categoryId, sort))
+activate ItemSvc
+ItemSvc -> ItemRepo : search(query)
+ItemRepo -> DB : SELECT ... WHERE title LIKE ? ESCAPE '\\' ORDER BY ...
+DB --> ItemRepo : 结果集
+ItemRepo --> ItemSvc : List<Item>
+ItemSvc --> Buyer : 结果表格
+deactivate ItemSvc
+
+Buyer -> ItemSvc : favorite(userId, itemId)
+activate ItemSvc
+ItemSvc -> ItemRepo : findById(itemId)
+ItemRepo --> ItemSvc : Item（不存在则抛 BusinessRuleException）
+ItemSvc -> FavRepo : add(userId, itemId)
+FavRepo -> DB : INSERT OR IGNORE INTO favorites
+ItemSvc --> Buyer : 收藏成功
+deactivate ItemSvc
+
+== 流转（迭代 2 实现） ==
+Buyer -> DealSvc : createIntent(itemId, buyerId, message)
+activate DealSvc
+DealSvc -> DealSvc : 校验物品在售、不能买自己的物品
+DealSvc -> DealRepo : insert(deal)
+DealRepo -> DB : INSERT INTO deals(status='PENDING')
+DealSvc --> Buyer : dealId
+deactivate DealSvc
+
+Seller -> DealSvc : accept(dealId, sellerId)
+activate DealSvc
+DealSvc -> DealSvc : 校验操作者是 seller、状态为 PENDING
+DealSvc -> DealRepo : update(status='ACCEPTED')
+DealSvc -> ItemRepo : updateStatus(itemId, RESERVED)
+deactivate DealSvc
+
+Seller -> DealSvc : complete(dealId, sellerId)
+activate DealSvc
+DealSvc -> DealSvc : 校验状态为 ACCEPTED
+DealSvc -> DealRepo : update(status='COMPLETED', completedAt=now)
+DealSvc -> ItemRepo : updateStatus(itemId, COMPLETED)
+DealSvc --> Seller : 流转完成，双方可互评
+deactivate DealSvc
+
+note over DealSvc, DB
+  完成流转的三步写操作
+  （流转状态、物品状态、操作日志）
+  在同一事务中提交，任一失败整体回滚
+end note
+
+@enduml
