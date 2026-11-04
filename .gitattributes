@@ -1,0 +1,18 @@
+* text=auto
+
+# Maven Wrapper 的 shell 脚本必须保持 LF，否则在 Linux/macOS 上无法执行
+mvnw text eol=lf
+*.sh text eol=lf
+
+# Windows 批处理保持 CRLF
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# SQL 与 Markdown 统一 LF
+*.sql text eol=lf
+*.md text eol=lf
+
+# 图片按二进制处理
+*.png binary
+*.jpg binary
+*.ico binary
