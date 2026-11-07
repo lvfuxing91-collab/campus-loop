@@ -1,60 +1,33 @@
-@startuml 时序图-登录
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
 skinparam shadowing false
+skinparam classAttributeIconSize 0
 title 登录时序图
-
-actor 用户
+actor "用户" as U
 participant "LoginFrame" as UI
-participant "AuthServiceImpl" as Auth
-participant "UserRepositoryImpl" as Repo
-participant "PasswordUtil" as Pwd
-participant "OperationLogRepositoryImpl" as Log
-database "SQLite\ncampus.db" as DB
-
-用户 -> UI : 输入用户名、密码\n点击"登录"
-activate UI
-UI -> UI : 校验非空
-alt 输入为空
-    UI --> 用户 : 提示"请输入用户名和密码"
-end
-
-UI -> Auth : login(username, rawPassword)
-activate Auth
-Auth -> Repo : findByUsername(username)
-activate Repo
-Repo -> DB : SELECT * FROM users WHERE username = ?
-DB --> Repo : 结果行 / 空
-Repo --> Auth : Optional<User>
-deactivate Repo
-
-alt 用户不存在
-    Auth --> UI : throw AuthenticationException("用户名或密码错误")
-else 账号已停用
-    Auth -> Auth : user.isEnabled() == false
-    Auth --> UI : throw AuthenticationException("账号已被停用，请联系管理员")
-else 密码错误
-    Auth -> Pwd : verify(rawPassword, salt, hash)
-    Pwd --> Auth : false
-    Auth --> UI : throw AuthenticationException("用户名或密码错误")
-else 认证通过
-    Auth -> Log : insert(OperationLog(LOGIN))
-    Log -> DB : INSERT INTO operation_logs
-    Auth --> UI : User
-end
-deactivate Auth
-
-alt 认证成功
-    UI -> UI : context.setCurrentUser(user)
-    UI -> UI : 打开 MainFrame
-    UI --> 用户 : 显示主界面
-else 认证失败
-    UI --> 用户 : JOptionPane 显示中文提示
-end
-deactivate UI
-
-note right of Auth
-  失败提示统一为"用户名或密码错误"，
-  不区分用户不存在与密码错误，
-  避免用户名枚举
+participant "AuthServiceImpl" as A
+participant "UserRepositoryImpl" as R
+participant "PasswordUtil" as P
+participant "OperationLog\nRepositoryImpl" as L
+database "SQLite" as DB
+== 认证成功路径 ==
+U -> UI : 输入账号、密码并点击登录
+UI -> A : login(username, rawPassword)
+A -> A : 校验输入格式与非空
+A -> R : findByUsername(name)
+R -> DB : 参数化查询users
+DB --> R : 返回记录
+R --> A : Optional<User>
+A -> A : 检查user.isEnabled()
+A -> P : verify(password, salt, hash)
+P --> A : true
+A -> L : insert(登录日志)
+L -> DB : INSERT operation_logs
+A --> UI : 返回User
+UI -> UI : 设置当前用户并打开MainFrame
+note over UI,DB
+输入不合法：ValidationException；账号不存在或密码错误：AuthenticationException；停用账号单独提示。
+错误由UiUtils.showError展示并保留登录窗口；账号查询和密码检查由AuthServiceImpl执行。
+当前登录日志采用尽力写入：失败记warning，认证结果不因日志写入失败而回滚。
 end note
-
 @enduml

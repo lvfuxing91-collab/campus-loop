@@ -1,140 +1,96 @@
-# Git 协作规范
+# Git协作规范
 
-## 一、分支模型
+## 目录
 
-| 分支 | 用途 | 生命周期 |
-|---|---|---|
-| `main` | 主干，始终可编译、可运行 | 长期 |
-| `iterN/m1-*` | 成员 1 每轮的开发分支 | 合并并推送到远程后删除 |
-| `iterN/m2-*` | 成员 2 每轮的开发分支 | 同上 |
-| `iterN/m3-*` | 成员 3 每轮的开发分支 | 同上 |
+- [一、分支与基线](#一分支与基线)
+- [二、提交范围与说明](#二提交范围与说明)
+- [三、作者与GitHub关联](#三作者与github关联)
+- [四、交接、合并与标签](#四交接合并与标签)
+- [五、提交次数与证据](#五提交次数与证据)
 
-迭代 1 的实际分支：
+## 一、分支与基线
 
-| 分支 | 作者身份 |
+| 分支 | 用途 |
 |---|---|
-| `iter1/m1-design-data` | 成员1-数据层 `<member1@campus-loop.local>` |
-| `iter1/m2-service-test` | 成员2-业务层 `<member2@campus-loop.local>` |
-| `iter1/m3-gui-build` | 成员3-界面层 `<member3@campus-loop.local>` |
+| main | 小组集成主干，保持可构建 |
+| iter1/m1-design-data | 成员1原有设计与数据层开发线 |
+| iter1/m2-service-test | 成员2原有业务与测试开发线 |
+| iter1/m3-gui-build | 成员3原有GUI与构建开发线 |
+| iterN/mX-主题 | 后续按迭代和成员划分的开发分支 |
 
-## 二、提交信息规范
+开始工作前确认工作区和分支。已合入main的成员分支可能缺少后来接入的模块依赖，不能只按分支名称判断代码是否完整。后续分支从小组确认的集成基线创建。
 
-格式：`类型(范围): 中文描述`
+```bash
+git status --short
+```
+
+```bash
+git log --graph --oneline --decorate --all
+```
+
+## 二、提交范围与说明
+
+格式：类型(范围): 中文描述。一次提交围绕一项工作，按文件选择暂存范围。
 
 | 类型 | 用途 | 示例 |
 |---|---|---|
-| feat | 新功能 | `feat(dao): 实现物品检索与排序` |
-| fix | 缺陷修复 | `fix(ui): 修复管理员停用自己的账号` |
-| refactor | 重构（不改行为） | `refactor(dao): 抽取 JDBC 模板方法` |
-| test | 测试相关 | `test(service): 增加注册重名用例` |
-| docs | 文档 | `docs(设计): 补充接口契约` |
-| build | 构建与依赖 | `build: 引入 maven-shade-plugin` |
-| chore | 杂项 | `chore: 忽略 data 目录` |
+| feat | 新功能 | feat(dao): 实现物品检索 |
+| fix | 缺陷修复 | fix(dao): 修复参数绑定 |
+| test | 测试 | test(dao): 补充事务回滚用例 |
+| docs | 文档与UML | docs(设计): 校正迭代1数据层设计 |
+| refactor | 保持行为的重构 | refactor(dao): 统一结果映射 |
+| build | 构建与依赖 | build(app): 调整JAR打包 |
 
-要求：
-
-- 一行标题不超过 50 个字符，正文说明"为什么"
-- 一次提交只做一件事，不把格式化与功能混在一起
-- 不提交 `target/`、`data/*.db`、日志、IDE 配置（已在 `.gitignore` 中）
-
-## 三、作者身份
-
-本项目的三份产出在同一台机器上完成，提交时用 `-c` 参数临时覆盖作者，**不修改全局配置**：
+Markdown、UML源文件与对应图片放在同一项设计提交中。target、运行数据库、日志和IDE配置不提交。提交前检查差异与暂存内容，避免整仓git add -A带入无关文件。
 
 ```bash
-git -c user.name="成员1-数据层" -c user.email="member1@campus-loop.local" commit -m "feat(core): 定义实体与仓储接口"
+git diff --check
 ```
-
-这样 `git log --format='%an <%ae>'` 与 `git shortlog -sne --all` 都能区分三位成员。
-
-## 四、合并与标签
 
 ```bash
-# 合并前先同步主干
-git checkout main
-git merge --no-ff iter1/m1-design-data -m "merge: 合并成员1 迭代1 产出"
-git merge --no-ff iter1/m2-service-test -m "merge: 合并成员2 迭代1 产出"
-git merge --no-ff iter1/m3-gui-build   -m "merge: 合并成员3 迭代1 产出"
-
-# 打标签
-git tag -a iter1 -m "迭代1：骨架可运行，接口冻结"
+git diff --stat
 ```
-
-规则：
-
-- 一律使用 `--no-ff`，保留分支拓扑，便于在报告中展示"三条开发线"
-- 冲突由产生冲突的分支负责人解决，解决后重新执行 DoD 的全部检查
-- 合并并推送到远程后再删除本地成员分支，保持分支列表干净（推送前务必保留，否则队友无法用自己的账号推送）
-
-## 五、交接与合并的先后
-
-1. 成员在自己的分支完成开发，跑通本机测试
-2. 提交交接单 `docs/交接/迭代N-成员X-交接.md`
-3. 下一棒按交接单第五节逐条验证，结果记入会议记录
-4. 验证通过才合入 `main`；不通过则退回分支继续修改
-
-## 六、GitHub 远程仓库
-
-### 6.1 创建仓库（由组长执行一次）
-
-方式一，使用 GitHub CLI：
 
 ```bash
-gh repo create campus-loop --private --source=. --remote=origin --push
+git diff --cached
 ```
 
-方式二，网页创建后关联：
+## 三、作者与GitHub关联
+
+Git提交保存author与committer。成员使用自己的姓名及与GitHub关联的邮箱；仓库历史中的memberX@campus-loop.local是已有提交的角色邮箱，不是必须照填的配置。
+
+推送者不等于提交作者。把别人已有的提交再推送一次不会改变作者，也不会自动让贡献者页面增加一个人。贡献关联还取决于作者邮箱与提交是否进入默认分支等条件。
 
 ```bash
-git remote add origin https://github.com/<你的账号>/campus-loop.git
-git branch -M main
-git push -u origin main
+git log -1 --format=fuller
 ```
 
-### 6.2 推送三个成员分支与标签
+## 四、交接、合并与标签
+
+1. 完成职责范围内的实现和文档，执行对应测试。
+2. 提供交接单，写明接口、已知问题和验证步骤。
+3. 下一位成员验收，修复冲突后重新检查。
+4. 使用--no-ff合并，阶段版本使用iterN标签。
+5. 合并、推送及分支清理由小组确认后执行。
+
+有未提交工作时不直接切换、重置或清理分支；先确认保留方式。涉及已共享历史的修改需与小组协调。
+
+## 五、提交次数与证据
+
+统计必须写明commit哈希、是否含合并提交以及筛选条件，不能把不同分支或不同时间点的次数混用。
 
 ```bash
-git push origin main
-git push origin iter1/m1-design-data iter1/m2-service-test iter1/m3-gui-build
-git push origin --tags
+git shortlog -sne HEAD
 ```
-
-### 6.3 邀请队友作为协作者
-
-仓库页面 → Settings → Collaborators → Add people → 输入队友 GitHub 用户名 → 发送邀请。
-
-**为什么必须邀请**：如果三个分支都由组长一个账号推送，GitHub 的 Contributors 页面只会显示组长一人。把队友加为协作者后，让他们用各自账号 `git push` 自己的分支，贡献者页面才会出现三个人。
-
-### 6.4 三人各自推送自己的分支（推荐做法）
-
-队友在自己机器上：
 
 ```bash
-git fetch origin
-git checkout iter1/m2-service-test      # 换成自己的分支
-# 用自己账号提交或直接推送
-git push origin iter1/m2-service-test
+git rev-list --count HEAD
 ```
-
-如果队友只做"推送"这一步，GitHub 会把该分支的提交归到推送者名下，Contributors 页面因此显示三人。
-
-### 6.5 提交记录证据
-
-课程要求的"提交记录截图"，可用以下命令生成（结果同时写入 `docs/协作/提交记录.md`）：
 
 ```bash
-git log --graph --oneline --all --decorate
-git shortlog -sne --all
-git log --format='%h %ad %an %s' --date=short
+git log --no-merges --format='%h %an <%ae> %s' HEAD
 ```
 
-## 七、常见问题
+成员原开发提交可按作者和固定基线查询；次数区分普通提交与合并提交。更新[提交记录](提交记录.md)后，在终端、IDE或仓库历史页保存实际记录截图，放在docs/协作目录并注明对应基线。文本拓扑和统计表保留，不能把尚未提交的工作计入次数。
 
-| 问题 | 处理 |
-|---|---|
-| 提交到了错误的分支 | `git cherry-pick <commit>` 到正确分支后，在原分支 `git reset --hard HEAD~1`（确认无未提交改动） |
-| 忘记切换身份，作者是全局账号 | 该提交可用 `git commit --amend --author="成员1-数据层 <member1@campus-loop.local>"` 修正（仅限未推送的提交） |
-| 合并产生冲突 | 在冲突文件里手工解决，`git add` 后 `git commit`，禁止 `git checkout --theirs .` 一把梭 |
-| 误提交了 `data/campus.db` | `git rm --cached data/campus.db` 并从 `.gitignore` 确认已忽略 |
-| 中文文件名在 Windows 显示乱码 | `git config core.quotepath false` |
-| 换行符警告 | `git config core.autocrlf true`（Windows） |
+截图归档在提交完成后进行，本轮文档修改完成但未commit时，记录当前基线即可。
