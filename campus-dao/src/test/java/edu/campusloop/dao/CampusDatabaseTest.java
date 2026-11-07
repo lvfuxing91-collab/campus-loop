@@ -242,6 +242,8 @@ public class CampusDatabaseTest {
             fail("无效买家应被外键约束拒绝");
         } catch (DataAccessException expected) {
             assertEquals(0, deals.countAll());
+            assertEquals("关联的数据不存在或正在被使用", expected.getMessage());
+            assertTrue("诊断细节应保留SQL供日志使用", expected.getDetail().contains("INSERT INTO deals"));
         }
     }
 
@@ -274,6 +276,7 @@ public class CampusDatabaseTest {
             fail("同一流转中同一评价人只能评价一次");
         } catch (DataAccessException expected) {
             assertEquals(1, reviews.findByDeal(dealId).size());
+            assertEquals("该数据已存在，请勿重复添加", expected.getMessage());
         }
     }
 
@@ -285,6 +288,7 @@ public class CampusDatabaseTest {
             fail("评分超出 1~5 应被 CHECK 约束拒绝");
         } catch (DataAccessException expected) {
             assertEquals(0, reviews.findByDeal(dealId).size());
+            assertEquals("数据不符合允许的取值要求", expected.getMessage());
         }
     }
 

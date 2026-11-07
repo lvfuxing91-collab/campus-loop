@@ -30,14 +30,16 @@ public final class DatabaseManager {
             try {
                 Files.createDirectories(parent);
             } catch (IOException e) {
-                throw new DataAccessException("无法创建数据库目录：" + parent, e);
+                throw new DataAccessException("无法创建数据目录，请检查运行目录权限",
+                        "无法创建数据库目录：" + parent, e);
             }
         }
         this.jdbcUrl = "jdbc:sqlite:" + this.databaseFile;
         try {
             Class.forName("org.sqlite.JDBC");
         } catch (ClassNotFoundException e) {
-            throw new DataAccessException("未找到 SQLite JDBC 驱动", e);
+            throw new DataAccessException("数据库驱动不可用，请确认运行环境完整",
+                    "未找到 SQLite JDBC 驱动", e);
         }
         configure();
     }
@@ -71,7 +73,8 @@ public final class DatabaseManager {
             }
             return connection;
         } catch (SQLException e) {
-            throw new DataAccessException("无法连接数据库：" + databaseFile, e);
+            throw new DataAccessException("数据库连接失败，请稍后重试",
+                    "无法连接数据库：" + databaseFile, e);
         }
     }
 
@@ -80,7 +83,7 @@ public final class DatabaseManager {
              Statement statement = connection.createStatement()) {
             statement.execute(sql);
         } catch (SQLException e) {
-            throw new DataAccessException("执行 SQL 失败：" + sql, e);
+            throw new DataAccessException(SqlErrors.friendlyMessage(e), SqlErrors.detail("执行", sql), e);
         }
     }
 
@@ -92,7 +95,7 @@ public final class DatabaseManager {
                 statement.execute(sql);
             }
         } catch (SQLException e) {
-            throw new DataAccessException("执行 SQL 脚本失败：" + sourceName, e);
+            throw new DataAccessException(SqlErrors.friendlyMessage(e), SqlErrors.detail("执行脚本", sourceName), e);
         }
     }
 
@@ -146,7 +149,8 @@ public final class DatabaseManager {
             statement.execute("PRAGMA foreign_keys = ON");
             statement.execute("PRAGMA journal_mode = WAL");
         } catch (SQLException e) {
-            throw new DataAccessException("初始化数据库连接失败：" + databaseFile, e);
+            throw new DataAccessException("数据库初始化失败，请稍后重试",
+                    "初始化数据库连接失败：" + databaseFile, e);
         }
     }
 
@@ -171,7 +175,8 @@ public final class DatabaseManager {
             }
             return text;
         } catch (IOException e) {
-            throw new DataAccessException("读取 SQL 脚本失败：" + sourceName, e);
+            throw new DataAccessException("数据库初始化脚本无法读取，请检查程序文件是否完整",
+                    "读取 SQL 脚本失败：" + sourceName, e);
         }
     }
 

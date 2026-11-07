@@ -2,6 +2,7 @@ package edu.campusloop.dao.repository;
 
 import edu.campusloop.core.exception.DataAccessException;
 import edu.campusloop.core.util.DateTimes;
+import edu.campusloop.dao.db.SqlErrors;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -30,24 +31,31 @@ public abstract class AbstractJdbcDao<T> {
      * 若当前线程存在事务连接，则复用该连接且不关闭，使多个仓储的写入共享同一事务；
      * 否则新开连接并在结束后关闭。
      */
-    protected <R> R withConnection(String errorMessage, SqlFunction<R> work) {
+    protected <R> R withConnection(String operation, String sql, SqlFunction<R> work) {
         Connection bound = database.currentTransactionConnection();
         if (bound != null) {
             try {
                 return work.apply(bound);
             } catch (SQLException e) {
-                throw new DataAccessException(errorMessage, e);
+                throw translate(operation, sql, e);
             }
         }
         try (Connection connection = database.openConnection()) {
             return work.apply(connection);
         } catch (SQLException e) {
-            throw new DataAccessException(errorMessage, e);
+            throw translate(operation, sql, e);
         }
     }
 
+    /**
+     * 异常转换：用户只看到与约束类别对应的中文提示，SQL与原始异常留在诊断细节中。
+     */
+    private static DataAccessException translate(String operation, String sql, SQLException e) {
+        return new DataAccessException(SqlErrors.friendlyMessage(e), SqlErrors.detail(operation, sql), e);
+    }
+
     protected List<T> queryList(String sql, Object... params) {
-        return withConnection("查询失败：" + sql, connection -> {
+        return withConnection("查询", sql, connection -> {
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 bind(statement, params);
                 try (ResultSet resultSet = statement.executeQuery()) {
@@ -67,7 +75,7 @@ public abstract class AbstractJdbcDao<T> {
     }
 
     protected <R> List<R> query(String sql, RowMapper<R> mapper, Object... params) {
-        return withConnection("查询失败：" + sql, connection -> {
+        return withConnection("查询", sql, connection -> {
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 bind(statement, params);
                 try (ResultSet resultSet = statement.executeQuery()) {
@@ -82,7 +90,7 @@ public abstract class AbstractJdbcDao<T> {
     }
 
     protected int queryInt(String sql, Object... params) {
-        return withConnection("查询失败：" + sql, connection -> {
+        return withConnection("查询", sql, connection -> {
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 bind(statement, params);
                 try (ResultSet resultSet = statement.executeQuery()) {
@@ -93,7 +101,7 @@ public abstract class AbstractJdbcDao<T> {
     }
 
     protected long queryLong(String sql, Object... params) {
-        return withConnection("查询失败：" + sql, connection -> {
+        return withConnection("查询", sql, connection -> {
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 bind(statement, params);
                 try (ResultSet resultSet = statement.executeQuery()) {
@@ -104,7 +112,7 @@ public abstract class AbstractJdbcDao<T> {
     }
 
     protected double queryDouble(String sql, Object... params) {
-        return withConnection("查询失败：" + sql, connection -> {
+        return withConnection("查询", sql, connection -> {
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 bind(statement, params);
                 try (ResultSet resultSet = statement.executeQuery()) {
@@ -115,7 +123,7 @@ public abstract class AbstractJdbcDao<T> {
     }
 
     protected int executeUpdate(String sql, Object... params) {
-        return withConnection("更新失败：" + sql, connection -> {
+        return withConnection("更新", sql, connection -> {
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 bind(statement, params);
                 return statement.executeUpdate();
@@ -124,7 +132,7 @@ public abstract class AbstractJdbcDao<T> {
     }
 
     protected long insertAndReturnId(String sql, Object... params) {
-        return withConnection("插入失败：" + sql, connection -> {
+        return withConnection("插入", sql, connection -> {
             try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
                 bind(statement, params);
                 statement.executeUpdate();

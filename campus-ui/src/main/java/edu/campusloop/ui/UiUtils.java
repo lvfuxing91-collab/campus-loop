@@ -1,5 +1,6 @@
 package edu.campusloop.ui;
 
+import edu.campusloop.core.exception.AppException;
 import edu.campusloop.core.logging.AppLogger;
 
 import javax.swing.JOptionPane;
@@ -39,11 +40,25 @@ public final class UiUtils {
         }
     }
 
+    /**
+     * 展示错误提示。
+     * <p>
+     * 只把可安全展示的中文消息弹给用户；数据库SQL、文件路径等诊断细节
+     * 通过 {@link AppException#getDetail()} 取得并只写入日志。
+     */
     public static void showError(Component parent, Throwable error) {
-        LOG.log(Level.WARNING, "界面操作失败", error);
+        String detail = null;
+        if (error instanceof AppException) {
+            detail = ((AppException) error).getDetail();
+        }
+        if (detail != null && !detail.trim().isEmpty()) {
+            LOG.log(Level.WARNING, "界面操作失败：" + detail, error);
+        } else {
+            LOG.log(Level.WARNING, "界面操作失败", error);
+        }
         String message = error.getMessage();
         if (message == null || message.trim().isEmpty()) {
-            message = error.getClass().getSimpleName();
+            message = "操作失败，请稍后重试";
         }
         JOptionPane.showMessageDialog(parent, message, "操作失败", JOptionPane.ERROR_MESSAGE);
     }
