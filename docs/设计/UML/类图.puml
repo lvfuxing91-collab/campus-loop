@@ -1,202 +1,90 @@
-@startuml 类图
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
 skinparam shadowing false
 skinparam classAttributeIconSize 0
-skinparam packageStyle rectangle
-skinparam defaultFontName "Microsoft YaHei"
-skinparam classFontSize 11
-skinparam nodesep 12
-skinparam ranksep 30
-hide empty members
 hide circle
-title 低碳校园资源循环流转系统 —— 类图（迭代 1）
-
-package "core.model" as model {
-  class User {
-    - id : long
-    - username : String
-    - passwordHash : String
-    - salt : String
-    - nickname : String
-    - role : Role
-    - creditScore : double
-    - enabled : boolean
-    + isAdmin() : boolean
-  }
-  class Item {
-    - id : long
-    - ownerId : long
-    - categoryId : long
-    - title : String
-    - tradeType : TradeType
-    - price : BigDecimal
-    - status : ItemStatus
-    - viewCount : int
-  }
-  class Category {
-    - id : long
-    - name : String
-    - sortOrder : int
-    - enabled : boolean
-  }
-  class Deal {
-    - id : long
-    - itemId : long
-    - buyerId : long
-    - sellerId : long
-    - status : DealStatus
-  }
-  class Review {
-    - dealId : long
-    - reviewerId : long
-    - revieweeId : long
-    - rating : int
-  }
-  class Favorite
-  class OperationLog
-  class CarbonFactor
-  class StatsReport
+title 领域模型与数据访问类图
+package "core.model" {
+class User {
+- id : long
+- username : String
+- role : Role
++ isAdmin() : boolean
 }
-
-package "core.repository" as repo {
-  interface UserRepository
-  interface ItemRepository
-  interface CategoryRepository
-  interface FavoriteRepository
-  interface DealRepository
-  interface ReviewRepository
-  interface OperationLogRepository
-  interface CarbonFactorRepository
+class Item {
+- ownerId, categoryId : long
+- title : String
+- price : BigDecimal
++ isOwnedBy(long) : boolean
 }
-
-package "core.service" as svc {
-  interface AuthService
-  interface ItemService
-  interface DealService
-  interface ReviewService
-  interface StatsService
-  interface AdminService
+class Category {
+- id : long
+- name : String
+- parentId : Long
 }
-
-package "core.query" as query {
-  class ItemQuery {
-    - keyword : String
-    - categoryId : Long
-    - sort : ItemSortType
-    + {static} builder() : ItemQueryBuilder
-  }
+class Favorite {
+- userId, itemId : long
+- createdAt : LocalDateTime
 }
-
-package "core.util" as util {
-  class PasswordUtil
-  class Validators
-  class CsvUtil
+class Deal {
+- itemId, buyerId, sellerId : long
+- status : DealStatus
+- completedAt : LocalDateTime
 }
-
-package "dao" as dao {
-  class DatabaseManager
-  abstract class AbstractJdbcDao
-  class UserRepositoryImpl
-  class ItemRepositoryImpl
-  class CategoryRepositoryImpl
-  class FavoriteRepositoryImpl
-  class DealRepositoryImpl <<迭代2>>
-  class ReviewRepositoryImpl <<迭代2>>
-  class OperationLogRepositoryImpl
-  class CarbonFactorRepositoryImpl
-  class DaoFactory
+class CarbonFactor {
+- categoryId : long
+- kgCo2SavedPerItem : double
 }
-
-package "service.impl" as svcimpl {
-  class AuthServiceImpl
-  class ItemServiceImpl
-  class StatsServiceImpl
-  class AdminServiceImpl
-  class DealServiceImpl <<迭代2>>
-  class ServiceFactory
+class OperationLog {
+- userId : long
+- action, detail : String
 }
-
-package "ui" as ui {
-  class LoginFrame
-  class MainFrame
-  class UiContext
-  class BrowsePanel
-  class MyItemsPanel
-  class FavoritesPanel
-  class StatsPanel
-  class AdminPanel
-  class ItemTableModel
+class Review {
+- dealId, reviewerId, revieweeId : long
+- rating : int
 }
-
-package "app" as app {
-  class Bootstrap
-  class Main
+class StatsReport {
+- totalUsers, totalItems : int
+- carbonSavedKg : double
+- itemsByCategory : Map
 }
-
-' ---------- 实体关系 ----------
 User "1" -- "0..*" Item : 发布
-Category "1" -- "0..*" Item : 归类
+Category "1" -- "0..*" Item : 分类
 User "1" -- "0..*" Favorite
 Item "1" -- "0..*" Favorite
 Item "1" -- "0..*" Deal
-User "1" -- "0..*" Deal : 买家 / 卖家
-Deal "1" -- "0..2" Review
+User "1" -- "0..*" Deal : 买家/卖家
+Deal "1" -- "0..2" Review : 成交互评
+User "1" -- "0..*" Review : 评价双方
 Category "1" -- "0..1" CarbonFactor
-
-' ---------- 仓储：实现关系 ----------
-AbstractJdbcDao <|-- UserRepositoryImpl
-AbstractJdbcDao <|-- ItemRepositoryImpl
-AbstractJdbcDao <|-- CategoryRepositoryImpl
-AbstractJdbcDao <|-- FavoriteRepositoryImpl
-AbstractJdbcDao <|-- DealRepositoryImpl
-AbstractJdbcDao <|-- ReviewRepositoryImpl
-AbstractJdbcDao <|-- OperationLogRepositoryImpl
-AbstractJdbcDao <|-- CarbonFactorRepositoryImpl
-
-UserRepository <|.. UserRepositoryImpl
-ItemRepository <|.. ItemRepositoryImpl
-CategoryRepository <|.. CategoryRepositoryImpl
-FavoriteRepository <|.. FavoriteRepositoryImpl
-DealRepository <|.. DealRepositoryImpl
-ReviewRepository <|.. ReviewRepositoryImpl
-OperationLogRepository <|.. OperationLogRepositoryImpl
-CarbonFactorRepository <|.. CarbonFactorRepositoryImpl
-
-DaoFactory ..> DatabaseManager
-DaoFactory ..> UserRepositoryImpl
-
-' ---------- 服务：实现与依赖 ----------
-AuthService <|.. AuthServiceImpl
-ItemService <|.. ItemServiceImpl
-StatsService <|.. StatsServiceImpl
-AdminService <|.. AdminServiceImpl
-DealService <|.. DealServiceImpl
-
-AuthServiceImpl ..> UserRepository
-AuthServiceImpl ..> PasswordUtil
-ItemServiceImpl ..> ItemRepository
-ItemServiceImpl ..> FavoriteRepository
-StatsServiceImpl ..> ItemRepository
-AdminServiceImpl ..> UserRepository
-ServiceFactory ..> DaoFactory
-
-' ---------- 界面 ----------
-LoginFrame ..> UiContext
-MainFrame ..> UiContext
-MainFrame *-- BrowsePanel
-BrowsePanel *-- ItemTableModel
-UiContext ..> AuthService
-UiContext ..> ItemService
-
-' ---------- 组合根 ----------
-Main ..> Bootstrap
-Bootstrap ..> DatabaseManager
-Bootstrap ..> DaoFactory
-Bootstrap ..> ServiceFactory
-Bootstrap ..> LoginFrame
-
-note bottom of DatabaseManager : 单例：全局唯一数据库入口
-note bottom of AbstractJdbcDao : 模板方法：JDBC 样板代码只写一次
-note bottom of ItemQuery : 建造者：可选检索条件组合
-note right of DealServiceImpl : 标 <<迭代2>> 的类\n本轮只有接口，实现留待下一轮
-
+User "1" -- "0..*" OperationLog
+}
+package "数据访问与装配" {
+ interface UserRepository {
+  + findById(long) : Optional<User>
+  + insert(User) : long
+ }
+ abstract class "AbstractJdbcDao<T>" as JdbcTemplate {
+  # mapRow(ResultSet) : T
+  # queryList(String, Object...)
+ }
+ class DatabaseManager {
+  + openConnection() : Connection
+  + inTransaction(SqlWork) : T
+ }
+ class UserRepositoryImpl
+ class DaoFactory
+ class ServiceFactory
+ class Bootstrap
+ UserRepository <|.. UserRepositoryImpl
+ JdbcTemplate <|-- UserRepositoryImpl
+ JdbcTemplate ..> DatabaseManager
+ DaoFactory ..> DatabaseManager
+ DaoFactory ..> UserRepositoryImpl : 创建
+ ServiceFactory ..> UserRepository : 接收接口
+ Bootstrap ..> DatabaseManager : 初始化
+ Bootstrap ..> DaoFactory : 创建
+ Bootstrap ..> ServiceFactory : 创建/注入
+}
+note bottom of StatsReport : 汇总对象，不单独建表
 @enduml

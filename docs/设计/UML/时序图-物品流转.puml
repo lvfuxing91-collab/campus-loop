@@ -1,87 +1,48 @@
-@startuml 时序图-物品流转
+@startuml
+skinparam defaultFontName "Microsoft YaHei"
 skinparam shadowing false
+skinparam classAttributeIconSize 0
 title 物品发布与流转时序图
-
-actor 发布者 as Seller
-actor 浏览者 as Buyer
-participant "PublishItemDialog" as Dlg
-participant "ItemServiceImpl" as ItemSvc
-participant "ItemRepositoryImpl" as ItemRepo
-participant "FavoriteRepositoryImpl" as FavRepo
-participant "DealServiceImpl" as DealSvc
-participant "DealRepositoryImpl" as DealRepo
-database "SQLite\ncampus.db" as DB
-
-== 发布（迭代 1 已实现） ==
-Seller -> Dlg : 填写名称/分类/交易方式/成色/价格
-activate Dlg
-Dlg -> Dlg : 表单校验（必填、价格为非负数字）
-Dlg -> ItemSvc : publish(ownerId, draft)
-activate ItemSvc
-ItemSvc -> ItemSvc : Validators 校验标题、描述、价格
-alt 校验失败
-    ItemSvc --> Dlg : throw ValidationException
-    Dlg --> Seller : 提示具体原因
-else 校验通过
-    ItemSvc -> ItemRepo : insert(item)
-    activate ItemRepo
-    ItemRepo -> DB : INSERT INTO items(...)
-    DB --> ItemRepo : 新主键
-    ItemRepo --> ItemSvc : id
-    deactivate ItemRepo
-    ItemSvc --> Dlg : id
-    Dlg --> Seller : 提示"发布成功"，刷新检索页
-end
-deactivate ItemSvc
-deactivate Dlg
-
-== 检索与收藏（迭代 1 已实现） ==
-Buyer -> ItemSvc : search(ItemQuery(keyword, categoryId, sort))
-activate ItemSvc
-ItemSvc -> ItemRepo : search(query)
-ItemRepo -> DB : SELECT ... WHERE title LIKE ? ESCAPE '\\' ORDER BY ...
-DB --> ItemRepo : 结果集
-ItemRepo --> ItemSvc : List<Item>
-ItemSvc --> Buyer : 结果表格
-deactivate ItemSvc
-
-Buyer -> ItemSvc : favorite(userId, itemId)
-activate ItemSvc
-ItemSvc -> ItemRepo : findById(itemId)
-ItemRepo --> ItemSvc : Item（不存在则抛 BusinessRuleException）
-ItemSvc -> FavRepo : add(userId, itemId)
-FavRepo -> DB : INSERT OR IGNORE INTO favorites
-ItemSvc --> Buyer : 收藏成功
-deactivate ItemSvc
-
-== 流转（迭代 2 实现） ==
-Buyer -> DealSvc : createIntent(itemId, buyerId, message)
-activate DealSvc
-DealSvc -> DealSvc : 校验物品在售、不能买自己的物品
-DealSvc -> DealRepo : insert(deal)
-DealRepo -> DB : INSERT INTO deals(status='PENDING')
-DealSvc --> Buyer : dealId
-deactivate DealSvc
-
-Seller -> DealSvc : accept(dealId, sellerId)
-activate DealSvc
-DealSvc -> DealSvc : 校验操作者是 seller、状态为 PENDING
-DealSvc -> DealRepo : update(status='ACCEPTED')
-DealSvc -> ItemRepo : updateStatus(itemId, RESERVED)
-deactivate DealSvc
-
-Seller -> DealSvc : complete(dealId, sellerId)
-activate DealSvc
-DealSvc -> DealSvc : 校验状态为 ACCEPTED
-DealSvc -> DealRepo : update(status='COMPLETED', completedAt=now)
-DealSvc -> ItemRepo : updateStatus(itemId, COMPLETED)
-DealSvc --> Seller : 流转完成，双方可互评
-deactivate DealSvc
-
-note over DealSvc, DB
-  完成流转的三步写操作
-  （流转状态、物品状态、操作日志）
-  在同一事务中提交，任一失败整体回滚
+actor "学生/发布者" as U
+participant "界面" as UI
+participant "ItemServiceImpl" as I
+participant "ItemRepository" as IR
+participant "FavoriteRepository" as F
+participant "DealService\n<<接口设计>>" as D
+participant "事务连接" as TX
+participant "DealRepository\n<<接口设计>>" as DR
+database "SQLite" as DB
+== 物品发布与收藏 ==
+U -> UI : 填写并提交发布表单
+UI -> I : publish(ownerId, draft)
+I -> I : 校验用户、字段与分类
+I -> IR : insert(item)
+IR -> DB : INSERT items
+IR --> I : 返回itemId
+I --> UI : 返回发布结果
+U -> UI : 选择物品并收藏
+UI -> I : favorite(userId, itemId)
+I -> IR : findById(itemId)，检查物品存在
+I -> F : add(userId, itemId)
+F -> DB : INSERT OR IGNORE favorites
+I --> UI : 返回收藏结果
+== 流转状态设计 ==
+U -> D : createIntent(itemId, buyerId, message)
+D -> IR : 查询物品并校验在售/非本人
+D -> DR : 保存PENDING意向
+DR -> DB : INSERT deals
+U -> D : accept(dealId, sellerId)
+D -> TX : 校验卖家与PENDING，更新ACCEPTED/RESERVED
+== 完成流转的事务设计 ==
+U -> D : complete(dealId, sellerId)
+D -> TX : 开启同一Connection事务
+TX -> DR : 更新COMPLETED及成交时间
+TX -> IR : 更新物品COMPLETED
+TX -> DB : 写完成日志并commit
+D --> U : 返回完成结果，开放互评
+note over UI,DB
+状态：PENDING→ACCEPTED→COMPLETED；PENDING可拒绝；未完成记录可按参与关系取消。
+流转/评价服务与仓储实现由迭代2补齐；事务设计要求所有相关写入共用同一Connection。
+任一步写入失败执行rollback；现有AbstractJdbcDao独立开连接，接入业务事务时需传递事务连接。
 end note
-
 @enduml
