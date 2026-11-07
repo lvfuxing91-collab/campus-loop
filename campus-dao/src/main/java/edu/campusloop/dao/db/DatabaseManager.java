@@ -21,6 +21,7 @@ public final class DatabaseManager {
 
     private final Path databaseFile;
     private final String jdbcUrl;
+    private final ThreadLocal<Connection> transactionConnection = new ThreadLocal<>();
 
     private DatabaseManager(Path databaseFile) {
         this.databaseFile = databaseFile.toAbsolutePath().normalize();
@@ -95,9 +96,32 @@ public final class DatabaseManager {
         }
     }
 
+    /**
+     * 返回当前线程正在执行的事务连接；不在事务中时返回 null。
+     * 仓储通过该连接判断是否需要复用外层事务，而不是各自新开连接。
+     */
+    public Connection currentTransactionConnection() {
+        return transactionConnection.get();
+    }
+
+    /**
+     * 在同一连接上执行一组写操作。事务内的仓储操作会自动复用该连接，
+     * 因此多张表的写入能够一并提交或回滚；嵌套调用复用最外层事务。
+     */
     public <T> T inTransaction(SqlWork<T> work) {
+        Connection bound = transactionConnection.get();
+        if (bound != null) {
+            try {
+                return work.execute(bound);
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new DataAccessException("事务执行失败", e);
+            }
+        }
         try (Connection connection = openConnection()) {
             connection.setAutoCommit(false);
+            transactionConnection.set(connection);
             try {
                 T result = work.execute(connection);
                 connection.commit();
@@ -108,6 +132,8 @@ public final class DatabaseManager {
             } catch (Exception e) {
                 rollbackQuietly(connection);
                 throw new DataAccessException("事务执行失败", e);
+            } finally {
+                transactionConnection.remove();
             }
         } catch (SQLException e) {
             throw new DataAccessException("事务执行失败", e);
