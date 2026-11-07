@@ -24,20 +24,41 @@ public abstract class AbstractJdbcDao<T> {
 
     protected abstract T mapRow(ResultSet resultSet) throws SQLException;
 
-    protected List<T> queryList(String sql, Object... params) {
-        try (Connection connection = database.openConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            bind(statement, params);
-            try (ResultSet resultSet = statement.executeQuery()) {
-                List<T> rows = new ArrayList<>();
-                while (resultSet.next()) {
-                    rows.add(mapRow(resultSet));
-                }
-                return rows;
+    /**
+     * 在可用连接上执行数据库操作。
+     * <p>
+     * 若当前线程存在事务连接，则复用该连接且不关闭，使多个仓储的写入共享同一事务；
+     * 否则新开连接并在结束后关闭。
+     */
+    protected <R> R withConnection(String errorMessage, SqlFunction<R> work) {
+        Connection bound = database.currentTransactionConnection();
+        if (bound != null) {
+            try {
+                return work.apply(bound);
+            } catch (SQLException e) {
+                throw new DataAccessException(errorMessage, e);
             }
-        } catch (SQLException e) {
-            throw new DataAccessException("查询失败：" + sql, e);
         }
+        try (Connection connection = database.openConnection()) {
+            return work.apply(connection);
+        } catch (SQLException e) {
+            throw new DataAccessException(errorMessage, e);
+        }
+    }
+
+    protected List<T> queryList(String sql, Object... params) {
+        return withConnection("查询失败：" + sql, connection -> {
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                bind(statement, params);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    List<T> rows = new ArrayList<>();
+                    while (resultSet.next()) {
+                        rows.add(mapRow(resultSet));
+                    }
+                    return rows;
+                }
+            }
+        });
     }
 
     protected T queryFirst(String sql, Object... params) {
@@ -46,78 +67,72 @@ public abstract class AbstractJdbcDao<T> {
     }
 
     protected <R> List<R> query(String sql, RowMapper<R> mapper, Object... params) {
-        try (Connection connection = database.openConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            bind(statement, params);
-            try (ResultSet resultSet = statement.executeQuery()) {
-                List<R> rows = new ArrayList<>();
-                while (resultSet.next()) {
-                    rows.add(mapper.map(resultSet));
+        return withConnection("查询失败：" + sql, connection -> {
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                bind(statement, params);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    List<R> rows = new ArrayList<>();
+                    while (resultSet.next()) {
+                        rows.add(mapper.map(resultSet));
+                    }
+                    return rows;
                 }
-                return rows;
             }
-        } catch (SQLException e) {
-            throw new DataAccessException("查询失败：" + sql, e);
-        }
+        });
     }
 
     protected int queryInt(String sql, Object... params) {
-        try (Connection connection = database.openConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            bind(statement, params);
-            try (ResultSet resultSet = statement.executeQuery()) {
-                return resultSet.next() ? resultSet.getInt(1) : 0;
+        return withConnection("查询失败：" + sql, connection -> {
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                bind(statement, params);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    return resultSet.next() ? resultSet.getInt(1) : 0;
+                }
             }
-        } catch (SQLException e) {
-            throw new DataAccessException("查询失败：" + sql, e);
-        }
+        });
     }
 
     protected long queryLong(String sql, Object... params) {
-        try (Connection connection = database.openConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            bind(statement, params);
-            try (ResultSet resultSet = statement.executeQuery()) {
-                return resultSet.next() ? resultSet.getLong(1) : 0L;
+        return withConnection("查询失败：" + sql, connection -> {
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                bind(statement, params);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    return resultSet.next() ? resultSet.getLong(1) : 0L;
+                }
             }
-        } catch (SQLException e) {
-            throw new DataAccessException("查询失败：" + sql, e);
-        }
+        });
     }
 
     protected double queryDouble(String sql, Object... params) {
-        try (Connection connection = database.openConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            bind(statement, params);
-            try (ResultSet resultSet = statement.executeQuery()) {
-                return resultSet.next() ? resultSet.getDouble(1) : 0.0;
+        return withConnection("查询失败：" + sql, connection -> {
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                bind(statement, params);
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    return resultSet.next() ? resultSet.getDouble(1) : 0.0;
+                }
             }
-        } catch (SQLException e) {
-            throw new DataAccessException("查询失败：" + sql, e);
-        }
+        });
     }
 
     protected int executeUpdate(String sql, Object... params) {
-        try (Connection connection = database.openConnection();
-             PreparedStatement statement = connection.prepareStatement(sql)) {
-            bind(statement, params);
-            return statement.executeUpdate();
-        } catch (SQLException e) {
-            throw new DataAccessException("更新失败：" + sql, e);
-        }
+        return withConnection("更新失败：" + sql, connection -> {
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                bind(statement, params);
+                return statement.executeUpdate();
+            }
+        });
     }
 
     protected long insertAndReturnId(String sql, Object... params) {
-        try (Connection connection = database.openConnection();
-             PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            bind(statement, params);
-            statement.executeUpdate();
-            try (ResultSet keys = statement.getGeneratedKeys()) {
-                return keys.next() ? keys.getLong(1) : 0L;
+        return withConnection("插入失败：" + sql, connection -> {
+            try (PreparedStatement statement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                bind(statement, params);
+                statement.executeUpdate();
+                try (ResultSet keys = statement.getGeneratedKeys()) {
+                    return keys.next() ? keys.getLong(1) : 0L;
+                }
             }
-        } catch (SQLException e) {
-            throw new DataAccessException("插入失败：" + sql, e);
-        }
+        });
     }
 
     private void bind(PreparedStatement statement, Object[] params) throws SQLException {
@@ -148,5 +163,10 @@ public abstract class AbstractJdbcDao<T> {
             return Boolean.TRUE.equals(value) ? 1 : 0;
         }
         return value;
+    }
+
+    /** 使用给定连接执行 JDBC 操作，允许抛出 SQLException 由模板统一转换。 */
+    protected interface SqlFunction<R> {
+        R apply(Connection connection) throws SQLException;
     }
 }
