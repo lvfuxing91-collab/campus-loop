@@ -2,6 +2,7 @@ package edu.campusloop.service;
 
 import edu.campusloop.core.repository.CarbonFactorRepository;
 import edu.campusloop.core.repository.CategoryRepository;
+import edu.campusloop.core.repository.DealRepository;
 import edu.campusloop.core.repository.FavoriteRepository;
 import edu.campusloop.core.repository.ItemRepository;
 import edu.campusloop.core.repository.OperationLogRepository;
@@ -19,11 +20,11 @@ public final class ServiceFactory {
     private final AdminService adminService;
 
     public ServiceFactory(UserRepository users, CategoryRepository categories, ItemRepository items,
-                          FavoriteRepository favorites, OperationLogRepository logs,
-                          CarbonFactorRepository carbonFactors) {
+                          FavoriteRepository favorites, DealRepository deals,
+                          OperationLogRepository logs, CarbonFactorRepository carbonFactors) {
         this.authService = new AuthServiceImpl(users, logs);
         this.itemService = new ItemServiceImpl(users, categories, items, favorites, logs);
-        this.statsService = new StatsServiceImpl(users, items, carbonFactors);
+        this.statsService = new StatsServiceImpl(users, items, deals, carbonFactors);
         this.adminService = new AdminServiceImpl(users, categories, items, logs, statsService);
     }
 

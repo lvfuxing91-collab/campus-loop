@@ -42,6 +42,8 @@ CREATE INDEX IF NOT EXISTS idx_items_owner    ON items(owner_id);
 CREATE INDEX IF NOT EXISTS idx_items_category ON items(category_id);
 CREATE INDEX IF NOT EXISTS idx_items_status   ON items(status);
 CREATE INDEX IF NOT EXISTS idx_items_created  ON items(created_at DESC);
+-- 状态与分类组合查询（分类筛选 + 默认在售过滤）
+CREATE INDEX IF NOT EXISTS idx_items_status_category ON items(status, category_id);
 
 CREATE TABLE IF NOT EXISTS favorites (
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -66,6 +68,8 @@ CREATE TABLE IF NOT EXISTS deals (
 CREATE INDEX IF NOT EXISTS idx_deals_buyer  ON deals(buyer_id);
 CREATE INDEX IF NOT EXISTS idx_deals_seller ON deals(seller_id);
 CREATE INDEX IF NOT EXISTS idx_deals_item   ON deals(item_id);
+-- 按状态计数与已完成口径统计
+CREATE INDEX IF NOT EXISTS idx_deals_status ON deals(status);
 
 CREATE TABLE IF NOT EXISTS reviews (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,

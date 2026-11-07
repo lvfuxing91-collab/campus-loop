@@ -33,8 +33,13 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -327,6 +332,64 @@ public class CampusDatabaseTest {
         deals.insert(newDeal());
         // 非事务状态下调用结束后连接已关闭，数据仍然持久化
         assertEquals(1, deals.countAll());
+    }
+
+    @Test
+    public void completedDealsGroupedByCategoryDeduplicateItems() {
+        Deal first = newDeal();
+        first.setStatus(DealStatus.COMPLETED);
+        deals.insert(first);
+        Deal second = newDeal();
+        second.setStatus(DealStatus.COMPLETED);
+        deals.insert(second);
+        Deal pending = newDeal();
+        deals.insert(pending);
+
+        Map<String, Integer> completed = deals.countCompletedByCategory();
+
+        // 同一物品两条完成记录只计一件，未完成意向不计入
+        assertEquals(1, completed.size());
+        assertEquals(Integer.valueOf(1), completed.get("教材书籍"));
+        // 流转记录仍按行计数：两条完成记录对应一次物品流转
+        assertEquals(2, deals.countByStatus(DealStatus.COMPLETED));
+        assertEquals(3, deals.countAll());
+    }
+
+    @Test
+    public void completedByCategoryIsEmptyWhenNoDealCompleted() {
+        deals.insert(newDeal());
+        assertTrue(deals.countCompletedByCategory().isEmpty());
+    }
+
+    @Test
+    public void schemaDeclaresIndexesForStatusQueries() {
+        assertTrue(indexExists("idx_deals_status"));
+        assertTrue(indexExists("idx_items_status_category"));
+        assertEquals(11, countExplicitIndexes());
+    }
+
+    private boolean indexExists(String name) {
+        try (Connection connection = database.openConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND name = ?")) {
+            statement.setString(1, name);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next() && resultSet.getInt(1) > 0;
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private int countExplicitIndexes() {
+        try (Connection connection = database.openConnection();
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT COUNT(*) FROM sqlite_master WHERE type = 'index' AND sql IS NOT NULL");
+             ResultSet resultSet = statement.executeQuery()) {
+            return resultSet.next() ? resultSet.getInt(1) : 0;
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private Deal newDeal() {

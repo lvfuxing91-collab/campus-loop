@@ -7,7 +7,9 @@ import edu.campusloop.dao.db.DatabaseManager;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 public class DealRepositoryImpl extends AbstractJdbcDao<Deal> implements DealRepository {
@@ -69,5 +71,39 @@ public class DealRepositoryImpl extends AbstractJdbcDao<Deal> implements DealRep
     @Override
     public int countByStatus(DealStatus status) {
         return queryInt("SELECT COUNT(*) FROM deals WHERE status = ?", status);
+    }
+
+    @Override
+    public Map<String, Integer> countCompletedByCategory() {
+        List<CategoryCount> counts = query(
+                "SELECT c.name AS category_name, COUNT(DISTINCT i.id) AS total"
+                        + " FROM deals d"
+                        + " JOIN items i ON i.id = d.item_id"
+                        + " JOIN categories c ON c.id = i.category_id"
+                        + " WHERE d.status = ?"
+                        + " GROUP BY c.name ORDER BY total DESC, c.name",
+                new RowMapper<CategoryCount>() {
+                    @Override
+                    public CategoryCount map(ResultSet resultSet) throws SQLException {
+                        return new CategoryCount(resultSet.getString("category_name"),
+                                resultSet.getInt("total"));
+                    }
+                },
+                DealStatus.COMPLETED);
+        Map<String, Integer> result = new LinkedHashMap<>();
+        for (CategoryCount count : counts) {
+            result.put(count.name, count.total);
+        }
+        return result;
+    }
+
+    private static final class CategoryCount {
+        private final String name;
+        private final int total;
+
+        private CategoryCount(String name, int total) {
+            this.name = name;
+            this.total = total;
+        }
     }
 }

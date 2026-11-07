@@ -23,6 +23,7 @@ public final class Bootstrap {
                 daos.categoryRepository(),
                 daos.itemRepository(),
                 daos.favoriteRepository(),
+                daos.dealRepository(),
                 daos.operationLogRepository(),
                 daos.carbonFactorRepository());
 
