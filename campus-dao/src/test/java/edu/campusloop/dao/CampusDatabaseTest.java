@@ -18,7 +18,6 @@ import edu.campusloop.core.repository.ReviewRepository;
 import edu.campusloop.core.repository.UserRepository;
 import edu.campusloop.core.util.PasswordUtil;
 import edu.campusloop.dao.db.DatabaseManager;
-import edu.campusloop.dao.db.SchemaInitializer;
 import edu.campusloop.dao.repository.CategoryRepositoryImpl;
 import edu.campusloop.dao.repository.DealRepositoryImpl;
 import edu.campusloop.dao.repository.FavoriteRepositoryImpl;
@@ -29,10 +28,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
-import java.io.IOException;
 import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -59,24 +55,13 @@ public class CampusDatabaseTest {
     private ReviewRepository reviews;
 
     @BeforeClass
-    public static void createDatabase() throws IOException {
-        Path directory = Files.createTempDirectory("campus-loop-test");
-        directory.toFile().deleteOnExit();
-        Path file = directory.resolve("campus-test.db");
-        file.toFile().deleteOnExit();
-        database = DatabaseManager.initialize(file);
+    public static void createDatabase() {
+        database = TestDatabase.get();
     }
 
     @Before
     public void resetSchema() {
-        database.execute("PRAGMA foreign_keys = OFF");
-        String[] tables = {"reviews", "deals", "favorites", "operation_logs", "items",
-                "carbon_factors", "categories", "users"};
-        for (String table : tables) {
-            database.execute("DROP TABLE IF EXISTS " + table);
-        }
-        database.execute("PRAGMA foreign_keys = ON");
-        SchemaInitializer.initialize(database);
+        TestDatabase.resetSchema(database);
 
         users = new UserRepositoryImpl(database);
         items = new ItemRepositoryImpl(database);
