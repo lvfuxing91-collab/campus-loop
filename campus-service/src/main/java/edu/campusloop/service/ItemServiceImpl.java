@@ -149,13 +149,16 @@ public class ItemServiceImpl implements ItemService {
         }
         draft.setTitle(Validators.title(draft.getTitle()));
         draft.setDescription(Validators.description(draft.getDescription()));
-        draft.setPrice(Validators.price(draft.getPrice() == null ? BigDecimal.ZERO : draft.getPrice()));
         if (draft.getCondition() == null) {
             draft.setCondition(ItemCondition.GOOD);
         }
         if (draft.getTradeType() == null) {
             draft.setTradeType(TradeType.SELL);
         }
+        BigDecimal price = draft.getPrice() == null ? BigDecimal.ZERO : draft.getPrice();
+        draft.setPrice(draft.getTradeType() == TradeType.SELL
+                ? Validators.price(price)
+                : BigDecimal.ZERO);
         Category category = categories.findById(draft.getCategoryId())
                 .filter(Category::isEnabled)
                 .orElseThrow(() -> new ValidationException("categoryId", "请选择有效的物品分类"));
