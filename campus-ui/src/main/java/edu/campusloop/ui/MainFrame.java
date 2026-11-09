@@ -4,9 +4,9 @@ import edu.campusloop.core.config.AppConfig;
 import edu.campusloop.core.model.User;
 import edu.campusloop.ui.panel.AdminPanel;
 import edu.campusloop.ui.panel.BrowsePanel;
+import edu.campusloop.ui.panel.DealPanel;
 import edu.campusloop.ui.panel.FavoritesPanel;
 import edu.campusloop.ui.panel.MyItemsPanel;
-import edu.campusloop.ui.panel.PlaceholderPanel;
 import edu.campusloop.ui.panel.StatsPanel;
 
 import javax.swing.BorderFactory;
@@ -31,6 +31,7 @@ public class MainFrame extends JFrame {
     private final BrowsePanel browsePanel;
     private final MyItemsPanel myItemsPanel;
     private final FavoritesPanel favoritesPanel;
+    private final DealPanel dealPanel;
     private final StatsPanel statsPanel;
 
     public MainFrame(UiContext context) {
@@ -46,14 +47,14 @@ public class MainFrame extends JFrame {
         browsePanel = new BrowsePanel(context);
         myItemsPanel = new MyItemsPanel(context);
         favoritesPanel = new FavoritesPanel(context);
+        dealPanel = new DealPanel(context);
         statsPanel = new StatsPanel(context);
 
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("物品检索", browsePanel);
         tabs.addTab("我的发布", myItemsPanel);
         tabs.addTab("我的收藏", favoritesPanel);
-        tabs.addTab("流转记录", new PlaceholderPanel("流转记录",
-                "发起意向、成交确认与互相评价将在迭代 2 提供。"));
+        tabs.addTab("流转记录", dealPanel);
         tabs.addTab("统计报表", statsPanel);
         if (context.getCurrentUser().isAdmin()) {
             tabs.addTab("管理员后台", new AdminPanel(context));
@@ -66,6 +67,8 @@ public class MainFrame extends JFrame {
                 myItemsPanel.refresh();
             } else if (index == 2) {
                 favoritesPanel.refresh();
+            } else if (index == 3) {
+                dealPanel.refresh();
             } else if (index == 4) {
                 statsPanel.refresh();
             }

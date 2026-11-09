@@ -38,6 +38,8 @@ public final class Bootstrap {
         UiContext uiContext = new UiContext(
                 services.authService(),
                 services.itemService(),
+                services.dealService(),
+                services.reviewService(),
                 services.statsService(),
                 services.adminService());
         new LoginFrame(uiContext).setVisible(true);
