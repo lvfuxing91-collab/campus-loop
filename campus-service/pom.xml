@@ -23,5 +23,10 @@
             <artifactId>junit</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>edu.campusloop</groupId>
+            <artifactId>campus-dao</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

@@ -113,6 +113,34 @@ public class ItemServiceTest {
         assertEquals("管理员修正标题", items.findById(itemId).get().getTitle());
     }
 
+    @Test(expected = BusinessRuleException.class)
+    public void completedItemCannotBeUpdated() {
+        long itemId = itemService.publish(seller.getId(),
+                draft("机械键盘", "九成新，按键功能正常", TradeType.SELL, "120"));
+        items.updateStatus(itemId, ItemStatus.COMPLETED);
+
+        itemService.update(seller.getId(), itemId,
+                draft("机械键盘", "试图修改", TradeType.SELL, "80"));
+    }
+
+    @Test(expected = BusinessRuleException.class)
+    public void completedItemCannotBeTakenOffShelf() {
+        long itemId = itemService.publish(seller.getId(),
+                draft("机械键盘", "九成新，按键功能正常", TradeType.SELL, "120"));
+        items.updateStatus(itemId, ItemStatus.COMPLETED);
+
+        itemService.offShelf(seller.getId(), itemId);
+    }
+
+    @Test(expected = BusinessRuleException.class)
+    public void reservedItemCannotBeTakenOffShelf() {
+        long itemId = itemService.publish(seller.getId(),
+                draft("机械键盘", "九成新，按键功能正常", TradeType.SELL, "120"));
+        items.updateStatus(itemId, ItemStatus.RESERVED);
+
+        itemService.offShelf(seller.getId(), itemId);
+    }
+
     @Test
     public void searchDefaultsToOnSaleAndPreservesOtherFilters() {
         ItemQuery requested = ItemQuery.builder()
