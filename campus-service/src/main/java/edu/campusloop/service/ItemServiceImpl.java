@@ -71,6 +71,9 @@ public class ItemServiceImpl implements ItemService {
         if (!existing.isOwnedBy(operatorId) && !operator.isAdmin()) {
             throw new BusinessRuleException("无权修改他人发布的物品");
         }
+        if (existing.getStatus() == ItemStatus.COMPLETED) {
+            throw new BusinessRuleException("已成交物品不能再修改");
+        }
         normalize(draft);
         applyEditableFields(existing, draft);
         existing.setUpdatedAt(LocalDateTime.now());
@@ -87,6 +90,12 @@ public class ItemServiceImpl implements ItemService {
         }
         if (existing.getStatus() == ItemStatus.OFF_SHELF) {
             throw new BusinessRuleException("该物品已下架");
+        }
+        if (existing.getStatus() == ItemStatus.RESERVED) {
+            throw new BusinessRuleException("物品正在流转中，请先取消流转");
+        }
+        if (existing.getStatus() == ItemStatus.COMPLETED) {
+            throw new BusinessRuleException("已成交物品不能再下架");
         }
         items.updateStatus(itemId, ItemStatus.OFF_SHELF);
         audit(operatorId, "下架物品", "下架物品 #" + itemId);

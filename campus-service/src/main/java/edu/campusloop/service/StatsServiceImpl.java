@@ -9,9 +9,14 @@ import edu.campusloop.core.repository.DealRepository;
 import edu.campusloop.core.repository.ItemRepository;
 import edu.campusloop.core.repository.UserRepository;
 import edu.campusloop.core.service.StatsService;
+import edu.campusloop.core.util.CsvUtil;
 
 import java.nio.file.Path;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class StatsServiceImpl implements StatsService {
@@ -44,7 +49,22 @@ public class StatsServiceImpl implements StatsService {
 
     @Override
     public void exportCsv(long operatorId, Path file) {
-        throw new UnsupportedOperationException("统计报表导出将在迭代 2 提供");
+        if (file == null) {
+            throw new IllegalArgumentException("导出路径不能为空");
+        }
+        StatsReport report = generate(operatorId);
+        List<String> headers = Arrays.asList("指标", "数值", "分类", "物品数量");
+        List<List<String>> rows = new ArrayList<>();
+        rows.add(Arrays.asList("用户总数", String.valueOf(report.getTotalUsers()), "", ""));
+        rows.add(Arrays.asList("物品总数", String.valueOf(report.getTotalItems()), "", ""));
+        rows.add(Arrays.asList("在售物品", String.valueOf(report.getOnSaleItems()), "", ""));
+        rows.add(Arrays.asList("流转总数", String.valueOf(report.getTotalDeals()), "", ""));
+        rows.add(Arrays.asList("已完成流转", String.valueOf(report.getCompletedDeals()), "", ""));
+        rows.add(Arrays.asList("低碳减排估算(kg)", decimal(report.getCarbonSavedKg()), "", ""));
+        for (Map.Entry<String, Integer> entry : report.getItemsByCategory().entrySet()) {
+            rows.add(Arrays.asList("分类物品数量", "", entry.getKey(), String.valueOf(entry.getValue())));
+        }
+        CsvUtil.write(file, headers, rows);
     }
 
     /**
@@ -66,5 +86,9 @@ public class StatsServiceImpl implements StatsService {
             }
         }
         return Math.round(saved * 100) / 100.0;
+    }
+
+    private String decimal(double value) {
+        return BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
     }
 }
