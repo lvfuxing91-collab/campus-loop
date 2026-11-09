@@ -1,6 +1,7 @@
 package edu.campusloop.dao.repository;
 
 import edu.campusloop.core.enums.ItemStatus;
+import edu.campusloop.core.exception.ValidationException;
 import edu.campusloop.core.model.Item;
 import edu.campusloop.core.query.ItemQuery;
 import edu.campusloop.core.repository.ItemRepository;
@@ -58,6 +59,10 @@ public class ItemRepositoryImpl extends AbstractJdbcDao<Item> implements ItemRep
 
     @Override
     public List<Item> search(ItemQuery query) {
+        // 服务层已做校验，这里再兜一层，避免直接调用仓储时因空条件抛出 NullPointerException
+        if (query == null) {
+            throw new ValidationException("query", "查询条件不能为空");
+        }
         StringBuilder sql = new StringBuilder(ItemMapper.SELECT).append(" WHERE 1 = 1");
         List<Object> params = new ArrayList<>();
 
