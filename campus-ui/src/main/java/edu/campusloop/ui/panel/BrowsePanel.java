@@ -31,6 +31,7 @@ public class BrowsePanel extends JPanel {
     private final JButton searchButton = new JButton("搜索");
     private final JButton resetButton = new JButton("重置");
     private final JButton favoriteButton = new JButton("收藏 / 取消收藏");
+    private final JButton intentButton = new JButton("发起流转意向");
 
     public BrowsePanel(UiContext context) {
         super(new BorderLayout(8, 8));
@@ -44,6 +45,7 @@ public class BrowsePanel extends JPanel {
 
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
         bottom.add(favoriteButton);
+        bottom.add(intentButton);
         JLabel tip = new JLabel("支持按名称、描述、标签模糊搜索；收藏后会出现在“我的收藏”");
         tip.setForeground(Color.GRAY);
         bottom.add(tip);
@@ -52,6 +54,7 @@ public class BrowsePanel extends JPanel {
         searchButton.addActionListener(e -> search());
         resetButton.addActionListener(e -> reset());
         favoriteButton.addActionListener(e -> toggleFavorite());
+        intentButton.addActionListener(e -> createIntent());
         keywordField.addActionListener(e -> search());
 
         refresh();
@@ -118,6 +121,27 @@ public class BrowsePanel extends JPanel {
         }
         sortCombo.setSelectedIndex(0);
         search();
+    }
+
+    private void createIntent() {
+        int viewRow = table.getSelectedRow();
+        if (viewRow < 0) {
+            UiUtils.showInfo(this, "请先在列表中选择一个物品");
+            return;
+        }
+        Item item = model.getItemAt(table.convertRowIndexToModel(viewRow));
+        String message = javax.swing.JOptionPane.showInputDialog(this,
+                "对《" + item.getTitle() + "》发起流转，可附留言：", "发起流转意向",
+                javax.swing.JOptionPane.PLAIN_MESSAGE);
+        if (message == null) {
+            return;
+        }
+        try {
+            context.dealService().createIntent(item.getId(), context.currentUserId(), message);
+            UiUtils.showInfo(this, "意向已发起，可在“流转记录”页查看");
+        } catch (RuntimeException e) {
+            UiUtils.showError(this, e);
+        }
     }
 
     private void toggleFavorite() {
