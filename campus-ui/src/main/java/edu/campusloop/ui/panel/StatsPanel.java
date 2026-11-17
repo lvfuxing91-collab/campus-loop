@@ -12,12 +12,14 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.JFileChooser;
 import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
+import java.io.File;
 import java.util.Map;
 
 public class StatsPanel extends JPanel {
@@ -48,9 +50,7 @@ public class StatsPanel extends JPanel {
 
         JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         JButton refreshButton = new JButton("刷新统计");
-        JButton exportButton = new JButton("导出 CSV（迭代 2）");
-        exportButton.setEnabled(false);
-        exportButton.setToolTipText("统计报表导出将在迭代 2 提供");
+        JButton exportButton = new JButton("导出 CSV");
         actions.add(exportButton);
         actions.add(refreshButton);
         header.add(actions, BorderLayout.EAST);
@@ -70,12 +70,32 @@ public class StatsPanel extends JPanel {
         body.add(new JScrollPane(categoryTable), BorderLayout.CENTER);
         add(body, BorderLayout.CENTER);
 
-        JLabel note = new JLabel("说明：流转数量与 CSV 导出将在接入流转记录后启用；减排量按各分类系数估算。");
+        JLabel note = new JLabel("说明：减排量仅按已完成流转的物品和分类系数估算。");
         note.setForeground(Color.GRAY);
         add(note, BorderLayout.SOUTH);
 
         refreshButton.addActionListener(e -> refresh());
+        exportButton.addActionListener(e -> exportCsv());
         refresh();
+    }
+
+    private void exportCsv() {
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle("导出统计报表");
+        chooser.setSelectedFile(new File("campus-loop-statistics.csv"));
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        File file = chooser.getSelectedFile();
+        if (!file.getName().toLowerCase().endsWith(".csv")) {
+            file = new File(file.getParentFile(), file.getName() + ".csv");
+        }
+        try {
+            context.statsService().exportCsv(context.currentUserId(), file.toPath());
+            UiUtils.showInfo(this, "统计报表已导出至：\n" + file.getAbsolutePath());
+        } catch (RuntimeException e) {
+            UiUtils.showError(this, e);
+        }
     }
 
     private JPanel createCard(String title, JLabel valueLabel) {
