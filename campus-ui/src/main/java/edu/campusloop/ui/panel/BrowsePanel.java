@@ -6,6 +6,7 @@ import edu.campusloop.core.model.Item;
 import edu.campusloop.core.query.ItemQuery;
 import edu.campusloop.ui.UiContext;
 import edu.campusloop.ui.UiUtils;
+import edu.campusloop.ui.dialog.ItemDetailDialog;
 import edu.campusloop.ui.table.ItemTableModel;
 
 import javax.swing.BorderFactory;
@@ -19,6 +20,9 @@ import javax.swing.JTextField;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.FlowLayout;
+import java.awt.Window;
+import java.math.BigDecimal;
+import javax.swing.SwingUtilities;
 
 public class BrowsePanel extends JPanel {
 
@@ -28,10 +32,13 @@ public class BrowsePanel extends JPanel {
     private final JTextField keywordField = new JTextField(14);
     private final JComboBox<Category> categoryCombo = new JComboBox<>();
     private final JComboBox<ItemSortType> sortCombo = new JComboBox<>(ItemSortType.values());
+    private final JTextField minPriceField = new JTextField(6);
+    private final JTextField maxPriceField = new JTextField(6);
     private final JButton searchButton = new JButton("搜索");
     private final JButton resetButton = new JButton("重置");
     private final JButton favoriteButton = new JButton("收藏 / 取消收藏");
     private final JButton intentButton = new JButton("发起流转意向");
+    private final JButton detailButton = new JButton("查看详情");
 
     public BrowsePanel(UiContext context) {
         super(new BorderLayout(8, 8));
@@ -44,6 +51,7 @@ public class BrowsePanel extends JPanel {
         add(new JScrollPane(table), BorderLayout.CENTER);
 
         JPanel bottom = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
+        bottom.add(detailButton);
         bottom.add(favoriteButton);
         bottom.add(intentButton);
         JLabel tip = new JLabel("支持按名称、描述、标签模糊搜索；收藏后会出现在“我的收藏”");
@@ -55,6 +63,15 @@ public class BrowsePanel extends JPanel {
         resetButton.addActionListener(e -> reset());
         favoriteButton.addActionListener(e -> toggleFavorite());
         intentButton.addActionListener(e -> createIntent());
+        detailButton.addActionListener(e -> openDetail());
+        table.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent event) {
+                if (event.getClickCount() == 2) {
+                    openDetail();
+                }
+            }
+        });
         keywordField.addActionListener(e -> search());
 
         refresh();
@@ -66,6 +83,10 @@ public class BrowsePanel extends JPanel {
         toolbar.add(keywordField);
         toolbar.add(new JLabel("分类"));
         toolbar.add(categoryCombo);
+        toolbar.add(new JLabel("价格"));
+        toolbar.add(minPriceField);
+        toolbar.add(new JLabel("至"));
+        toolbar.add(maxPriceField);
         toolbar.add(new JLabel("排序"));
         toolbar.add(sortCombo);
         toolbar.add(searchButton);
@@ -102,9 +123,12 @@ public class BrowsePanel extends JPanel {
         try {
             Category category = (Category) categoryCombo.getSelectedItem();
             Long categoryId = category != null && category.getId() > 0 ? category.getId() : null;
+            BigDecimal minPrice = parsePrice(minPriceField.getText(), "最低价格");
+            BigDecimal maxPrice = parsePrice(maxPriceField.getText(), "最高价格");
             ItemQuery query = ItemQuery.builder()
                     .keyword(keywordField.getText())
                     .categoryId(categoryId)
+                    .priceRange(minPrice, maxPrice)
                     .sort((ItemSortType) sortCombo.getSelectedItem())
                     .pageSize(200)
                     .build();
@@ -116,10 +140,39 @@ public class BrowsePanel extends JPanel {
 
     private void reset() {
         keywordField.setText("");
+        minPriceField.setText("");
+        maxPriceField.setText("");
         if (categoryCombo.getItemCount() > 0) {
             categoryCombo.setSelectedIndex(0);
         }
         sortCombo.setSelectedIndex(0);
+        search();
+    }
+
+    private BigDecimal parsePrice(String text, String fieldName) {
+        if (text == null || text.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            BigDecimal value = new BigDecimal(text.trim());
+            if (value.signum() < 0) {
+                throw new NumberFormatException();
+            }
+            return value;
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(fieldName + "必须是非负数字");
+        }
+    }
+
+    private void openDetail() {
+        int viewRow = table.getSelectedRow();
+        if (viewRow < 0) {
+            UiUtils.showInfo(this, "请先在列表中选择一个物品");
+            return;
+        }
+        Item item = model.getItemAt(table.convertRowIndexToModel(viewRow));
+        Window owner = SwingUtilities.getWindowAncestor(this);
+        new ItemDetailDialog(owner, context, item).setVisible(true);
         search();
     }
 
