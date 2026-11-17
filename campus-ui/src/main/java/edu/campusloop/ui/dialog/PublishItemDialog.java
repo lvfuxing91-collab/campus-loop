@@ -95,7 +95,17 @@ public class PublishItemDialog extends JDialog {
 
         save.addActionListener(e -> save());
         cancel.addActionListener(e -> dispose());
+        tradeCombo.addActionListener(e -> updatePriceState());
+        updatePriceState();
         return panel;
+    }
+
+    private void updatePriceState() {
+        boolean selling = tradeCombo.getSelectedItem() == TradeType.SELL;
+        priceField.setEnabled(selling);
+        if (!selling) {
+            priceField.setText("0");
+        }
     }
 
     private void addRow(JPanel panel, GridBagConstraints gbc, String label, java.awt.Component field) {
