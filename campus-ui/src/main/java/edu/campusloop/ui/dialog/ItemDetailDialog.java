@@ -2,6 +2,7 @@ package edu.campusloop.ui.dialog;
 
 import edu.campusloop.core.enums.ItemStatus;
 import edu.campusloop.core.model.Item;
+import edu.campusloop.core.model.Review;
 import edu.campusloop.core.util.DateTimes;
 import edu.campusloop.ui.UiContext;
 import edu.campusloop.ui.UiUtils;
@@ -18,6 +19,8 @@ import java.awt.Dialog;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
 import java.awt.Window;
+import java.util.List;
+import java.util.Locale;
 
 public class ItemDetailDialog extends JDialog {
 
@@ -53,12 +56,15 @@ public class ItemDetailDialog extends JDialog {
         JPanel facts = new JPanel(new GridLayout(0, 2, 8, 8));
         facts.add(new JLabel("分类：" + item.getCategoryName()));
         facts.add(new JLabel("发布者：" + item.getOwnerNickname()));
+        facts.add(new JLabel("发布者评价：" + reviewSummary()));
+        facts.add(new JLabel("浏览量：" + item.getViewCount()));
         facts.add(new JLabel("交易方式：" + item.getTradeType().getDisplayName()));
         facts.add(new JLabel("成色：" + item.getCondition().getDisplayName()));
         facts.add(new JLabel("价格：" + item.getPrice().stripTrailingZeros().toPlainString() + " 元"));
         facts.add(new JLabel("状态：" + item.getStatus().getDisplayName()));
-        facts.add(new JLabel("浏览量：" + item.getViewCount()));
         facts.add(new JLabel("发布时间：" + DateTimes.format(item.getCreatedAt())));
+        facts.add(new JLabel("标签：" + (item.getTags().isEmpty()
+                ? "-" : String.join("、", item.getTags()))));
 
         JTextArea description = new JTextArea(item.getDescription());
         description.setEditable(false);
@@ -83,5 +89,22 @@ public class ItemDetailDialog extends JDialog {
         intent.addActionListener(e -> new IntentDialog(this, context, item).setVisible(true));
         close.addActionListener(e -> dispose());
         return panel;
+    }
+
+    private String reviewSummary() {
+        try {
+            List<Review> reviews = context.reviewService().reviewsOf(item.getOwnerId());
+            if (reviews == null || reviews.isEmpty()) {
+                return "暂无评价";
+            }
+            int total = 0;
+            for (Review review : reviews) {
+                total += review.getRating();
+            }
+            double average = (double) total / reviews.size();
+            return String.format(Locale.ROOT, "%.1f / 5（%d条）", average, reviews.size());
+        } catch (RuntimeException e) {
+            return "暂不可用";
+        }
     }
 }

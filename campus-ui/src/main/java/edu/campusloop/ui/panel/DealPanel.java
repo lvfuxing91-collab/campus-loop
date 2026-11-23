@@ -1,6 +1,5 @@
 package edu.campusloop.ui.panel;
 
-import edu.campusloop.core.enums.DealStatus;
 import edu.campusloop.core.model.Deal;
 import edu.campusloop.ui.UiContext;
 import edu.campusloop.ui.UiUtils;
@@ -95,17 +94,12 @@ public class DealPanel extends JPanel {
     }
 
     private void updateButtons() {
-        Deal deal = selectedDeal(false);
-        boolean pending = deal != null && deal.getStatus() == DealStatus.PENDING;
-        boolean accepted = deal != null && deal.getStatus() == DealStatus.ACCEPTED;
-        boolean completed = deal != null && deal.getStatus() == DealStatus.COMPLETED;
-        boolean seller = deal != null && deal.getSellerId() == context.currentUserId();
-
-        acceptButton.setEnabled(pending && seller);
-        rejectButton.setEnabled(pending && seller);
-        completeButton.setEnabled(accepted && seller);
-        cancelButton.setEnabled(pending || accepted);
-        reviewButton.setEnabled(completed);
+        DealActionState state = DealActionState.of(selectedDeal(false), context.currentUserId());
+        acceptButton.setEnabled(state.isAcceptEnabled());
+        rejectButton.setEnabled(state.isRejectEnabled());
+        completeButton.setEnabled(state.isCompleteEnabled());
+        cancelButton.setEnabled(state.isCancelEnabled());
+        reviewButton.setEnabled(state.isReviewEnabled());
     }
 
     private void accept() {
