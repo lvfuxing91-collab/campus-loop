@@ -8,6 +8,7 @@ import edu.campusloop.ui.panel.DealPanel;
 import edu.campusloop.ui.panel.FavoritesPanel;
 import edu.campusloop.ui.panel.MyItemsPanel;
 import edu.campusloop.ui.panel.StatsPanel;
+import edu.campusloop.ui.dialog.ChangePasswordDialog;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -33,6 +34,7 @@ public class MainFrame extends JFrame {
     private final FavoritesPanel favoritesPanel;
     private final DealPanel dealPanel;
     private final StatsPanel statsPanel;
+    private final AdminPanel adminPanel;
 
     public MainFrame(UiContext context) {
         super("低碳校园资源循环流转系统");
@@ -49,6 +51,7 @@ public class MainFrame extends JFrame {
         favoritesPanel = new FavoritesPanel(context);
         dealPanel = new DealPanel(context);
         statsPanel = new StatsPanel(context);
+        adminPanel = context.getCurrentUser().isAdmin() ? new AdminPanel(context) : null;
 
         JTabbedPane tabs = new JTabbedPane();
         tabs.addTab("物品检索", browsePanel);
@@ -56,21 +59,23 @@ public class MainFrame extends JFrame {
         tabs.addTab("我的收藏", favoritesPanel);
         tabs.addTab("流转记录", dealPanel);
         tabs.addTab("统计报表", statsPanel);
-        if (context.getCurrentUser().isAdmin()) {
-            tabs.addTab("管理员后台", new AdminPanel(context));
+        if (adminPanel != null) {
+            tabs.addTab("管理员后台", adminPanel);
         }
         tabs.addChangeListener(e -> {
-            int index = tabs.getSelectedIndex();
-            if (index == 0) {
+            java.awt.Component selected = tabs.getSelectedComponent();
+            if (selected == browsePanel) {
                 browsePanel.refresh();
-            } else if (index == 1) {
+            } else if (selected == myItemsPanel) {
                 myItemsPanel.refresh();
-            } else if (index == 2) {
+            } else if (selected == favoritesPanel) {
                 favoritesPanel.refresh();
-            } else if (index == 3) {
+            } else if (selected == dealPanel) {
                 dealPanel.refresh();
-            } else if (index == 4) {
+            } else if (selected == statsPanel) {
                 statsPanel.refresh();
+            } else if (selected == adminPanel) {
+                adminPanel.refresh();
             }
         });
         add(tabs, BorderLayout.CENTER);
@@ -85,6 +90,14 @@ public class MainFrame extends JFrame {
         exit.addActionListener(e -> System.exit(0));
         fileMenu.add(exit);
 
+        JMenu accountMenu = new JMenu("账号");
+        JMenuItem changePassword = new JMenuItem("修改密码");
+        changePassword.addActionListener(e -> new ChangePasswordDialog(this, context).setVisible(true));
+        JMenuItem switchAccount = new JMenuItem("切换账号");
+        switchAccount.addActionListener(e -> switchAccount());
+        accountMenu.add(changePassword);
+        accountMenu.add(switchAccount);
+
         JMenu helpMenu = new JMenu("帮助");
         JMenuItem about = new JMenuItem("关于");
         about.addActionListener(e -> JOptionPane.showMessageDialog(this,
@@ -94,6 +107,7 @@ public class MainFrame extends JFrame {
         helpMenu.add(about);
 
         bar.add(fileMenu);
+        bar.add(accountMenu);
         bar.add(helpMenu);
         return bar;
     }
@@ -109,14 +123,17 @@ public class MainFrame extends JFrame {
         label.setFont(new Font("Microsoft YaHei", Font.BOLD, 14));
 
         JButton switchUser = new JButton("切换账号");
-        switchUser.addActionListener(e -> {
-            dispose();
-            new LoginFrame(context).setVisible(true);
-        });
+        switchUser.addActionListener(e -> switchAccount());
 
         panel.add(label, BorderLayout.WEST);
         panel.add(switchUser, BorderLayout.EAST);
         return panel;
+    }
+
+    private void switchAccount() {
+        context.setCurrentUser(null);
+        dispose();
+        new LoginFrame(context).setVisible(true);
     }
 
     private JPanel createStatusBar() {
